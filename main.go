@@ -4,15 +4,36 @@
 
 package main
 
-func csv() {
+import (
+	"fmt"
+	"os"
+	"path"
+	"path/filepath"
 
+	"github.com/joho/godotenv"
+)
+
+// For ease of use I dont follow do not follow DRY principle in this program all the time.
+
+var (
+	pwd         string     // print working directory
+	maxQuantity int    = 5 // Change this to adjust maximum quantity items of single SKU to be active after update
+)
+
+type EbayItem struct {
+	Sku    string
+	EbayId string
 }
 
-func sqlite() {
+func init() {
+	// Gets active directory of the exec file
+	path, err := filepath.Abs("./main.go")
+	if err != nil {
+		panic(err)
+	}
+	pwd = filepath.Dir(path)
 
-}
-
-func postgres() {
+	loadEnv()
 
 }
 
@@ -26,5 +47,27 @@ func main() {
 
 	// Use this if you would like to read quantities from postgres database
 	// postgres()
+
+}
+
+func loadEnv() {
+	err := godotenv.Load(path.Join(pwd, "env_app", ".env"))
+	if err != nil {
+		fmt.Println("Error loading env file (env_app/.env)")
+		os.Exit(1)
+	}
+	fmt.Println(".env file loaded")
+}
+
+// change the required data
+func csv() {
+
+}
+
+func sqlite() {
+
+}
+
+func postgres() {
 
 }
