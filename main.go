@@ -27,17 +27,17 @@ type EbayItem struct {
 
 func init() {
 	// Gets active directory of the exec file
-	path, err := filepath.Abs("./main.go")
+	path, err := os.Executable()
 	if err != nil {
+		fmt.Println("Failed to load .env from env_app/.env")
 		panic(err)
 	}
 	pwd = filepath.Dir(path)
 
-	loadEnv()
-
 }
 
 func main() {
+	loadEnv()
 
 	// Use this if you would like to read quantities from csv file
 	// csv()
@@ -54,7 +54,7 @@ func loadEnv() {
 	err := godotenv.Load(path.Join(pwd, "env_app", ".env"))
 	if err != nil {
 		fmt.Println("Error loading env file (env_app/.env)")
-		os.Exit(1)
+		// os.Exit(1)
 	}
 	fmt.Println(".env file loaded")
 }
