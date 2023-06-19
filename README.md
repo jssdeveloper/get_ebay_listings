@@ -10,6 +10,7 @@ After your account has been submited you have to create API keyset and generate 
 3. Copy ebay developer credentials in env_github\.env and replace neccesary fields
 
 4. You can input item stock data from csv file, postgres database or sqlite database. The program outputs csv file to be uploaded to ebay.
+5. You can create a cron job to run the program daily and send status update if the program completed the job or there was an error
 
 
 Used packages:
