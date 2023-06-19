@@ -1,5 +1,5 @@
 # Sync Ebay Quantities with csv file or databse
-Program written in Go to sync eBay quantities with database or csv file
+Program written in Go to sync eBay quantities with database or csv file (csv, sqlite, postgres, gorm, godotenv)
 
 1. Download the reository with command: git clone https://github.com/jssdeveloper/go_ebay_sync
 If you use windows, please make sure git is installed.
