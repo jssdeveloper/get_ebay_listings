@@ -1,4 +1,4 @@
-module jssdeveloper/go_ebay_sync/blob/main/main.go
+module jssdeveloper/get_ebay_listings/blob/main/main.go
 
 go 1.20
 
