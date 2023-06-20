@@ -10,80 +10,64 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"path"
-	"path/filepath"
-	"strconv"
+	"sync"
 	"time"
-
-	"github.com/joho/godotenv"
-)
-
-var (
-	pwd         string     // print working directory
-	maxQuantity int    = 5 // Change this to adjust maximum quantity items of single SKU to be active after update
 )
 
 type Listing struct {
 	ActiveList struct {
 		ItemArray struct {
 			Item []struct {
-				ItemID            string `xml:"ItemID"`
+				ItemID        int `xml:"ItemID"`
+				BuyItNowPrice struct {
+					Text       string `xml:",chardata"`
+					CurrencyID string `xml:"currencyID,attr"`
+				} `xml:"BuyItNowPrice"`
 				Title             string `xml:"Title"`
-				WatchCount        string `xml:"WatchCount"`
-				QuantityAvailable string `xml:"QuantityAvailable"`
+				WatchCount        int    `xml:"WatchCount"`
+				QuantityAvailable int    `xml:"QuantityAvailable"`
 				SKU               string `xml:"SKU"`
 				PictureDetails    string `xml:"PictureDetails"`
 			} `xml:"Item"`
 		} `xml:"ItemArray"`
 		PaginationResult struct {
-			TotalNumberOfPages   string `xml:"TotalNumberOfPages"`
-			TotalNumberOfEntries string `xml:"TotalNumberOfEntries"`
+			TotalNumberOfPages   int `xml:"TotalNumberOfPages"`
+			TotalNumberOfEntries int `xml:"TotalNumberOfEntries"`
 		} `xml:"PaginationResult"`
 	} `xml:"ActiveList"`
 }
 
-type AllListings struct {
-	Id     int
-	ItemId string
-	Sku    string
+type ItemOut struct {
+	ItemId     int
+	Sku        string
+	Price      float64
+	Title      string
+	WatchCount int
 }
 
-func init() {
-	getPath()
-	loadEnv()
-}
+var allItems []ItemOut
+var wg sync.WaitGroup
 
 func main() {
 
-	// Use this if you would like to read quantities from csv file
-	// csv()
-
-	// Use this if you would like to read quantities from sqlite database
-	// sqlite()
-
-	// Use this if you would like to read quantities from postgres database
-	// postgres()
-
-}
-
-func getPath() {
-	// Gets active directory of the exec file
-	path, err := os.Executable()
+	// get page count
+	fmt.Println("Gettig page count")
+	pages, err := getListings(1)
 	if err != nil {
-		fmt.Println("Failed to load .env from env_app/.env")
 		panic(err)
 	}
-	pwd = filepath.Dir(path)
-}
+	pageCount := pages.ActiveList.PaginationResult.TotalNumberOfPages
+	fmt.Println("Total number of pages:", pageCount, "Each page contains 200 listings")
 
-func loadEnv() {
-	err := godotenv.Load(path.Join(pwd, ".env"))
-	if err != nil {
-		fmt.Println("Error loading env file (env_app/.env)")
-		// os.Exit(1)
+	for i := 1; i <= pageCount; i++ {
+
+		data, err := getListings(i)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println("Done Page", i, "Fetched", len(data.ActiveList.ItemArray.Item), "items")
 	}
-	fmt.Println(".env file loaded")
 }
 
 // Function to get particular page
@@ -103,76 +87,44 @@ func xmlBody(page int) []byte {
 	return body
 }
 
-func GetAllListings(apiKey string) ([]AllListings, error) {
-	var api_key string = os.Getenv("EBAY_API_KEY")
-	var page int = 1
-	var id int = 1
+func getListings(page int) (Listing, error) {
+	xmlPayload := xmlBody(page)
 
-	allListings := []AllListings{}
-
-	for {
-		// Define the XML payload
-		xmlPayload := xmlBody(page)
-
-		// Create a new HTTP request with the XML payload
-		req, err := http.NewRequest("POST", "https://api.ebay.com/ws/api.dll", bytes.NewReader(xmlPayload))
-		if err != nil {
-			return nil, err
-		}
-
-		// Set the request headers
-		req.Header.Set("X-EBAY-API-SITEID", "77")
-		req.Header.Set("X-EBAY-API-COMPATIBILITY-LEVEL", "967")
-		req.Header.Set("X-EBAY-API-CALL-NAME", "GetMyeBaySelling")
-		req.Header.Set("X-EBAY-API-IAF-TOKEN", api_key)
-
-		// Create a new HTTP client with a timeout
-		client := &http.Client{
-			Timeout: time.Second * 10,
-		}
-
-		// Send the request and get the response
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		defer resp.Body.Close()
-
-		// Read the response body
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		listing := &Listing{}
-
-		_ = xml.Unmarshal([]byte(body), &listing)
-
-		getitem := listing.ActiveList.ItemArray.Item
-		TotalPages := listing.ActiveList.PaginationResult.TotalNumberOfPages
-		totalPagesInt, err := strconv.Atoi(TotalPages)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Println(totalPagesInt)
-
-		for _, v := range getitem {
-			itemId := v.ItemID
-			sku := v.SKU
-
-			currentListing := AllListings{id, itemId, sku}
-			allListings = append(allListings, currentListing)
-			id++
-		}
-		fmt.Println("Page", page, "of", totalPagesInt)
-		fmt.Println("-------------")
-
-		if page == totalPagesInt {
-			break
-		}
-		page++
+	req, err := http.NewRequest("POST", "https://api.ebay.com/ws/api.dll", bytes.NewReader(xmlPayload))
+	if err != nil {
+		panic(err)
 	}
 
-	return allListings, nil
+	// Set the request headers
+	req.Header.Set("X-EBAY-API-SITEID", "77")
+	req.Header.Set("X-EBAY-API-COMPATIBILITY-LEVEL", "967")
+	req.Header.Set("X-EBAY-API-CALL-NAME", "GetMyeBaySelling")
+	req.Header.Set("X-EBAY-API-IAF-TOKEN", ebay_api_key)
+
+	// Create a new HTTP client with a timeout
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	// Send the request and get the response
+	resp, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	listing := &Listing{}
+
+	_ = xml.Unmarshal([]byte(body), &listing)
+
+	fmt.Println("Fetched page", page)
+
+	return *listing, nil
 }
