@@ -78,7 +78,7 @@ func getPath() {
 }
 
 func loadEnv() {
-	err := godotenv.Load(path.Join(pwd, "keys", ".env"))
+	err := godotenv.Load(path.Join(pwd, ".env"))
 	if err != nil {
 		fmt.Println("Error loading env file (env_app/.env)")
 		// os.Exit(1)
