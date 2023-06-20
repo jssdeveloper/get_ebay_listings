@@ -19,8 +19,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// For ease of use I dont follow do not follow DRY principle in this program all the time.
-
 var (
 	pwd         string     // print working directory
 	maxQuantity int    = 5 // Change this to adjust maximum quantity items of single SKU to be active after update
@@ -80,7 +78,7 @@ func getPath() {
 }
 
 func loadEnv() {
-	err := godotenv.Load(path.Join(pwd, "env_app", ".env"))
+	err := godotenv.Load(path.Join(pwd, "keys", ".env"))
 	if err != nil {
 		fmt.Println("Error loading env file (env_app/.env)")
 		// os.Exit(1)
@@ -106,7 +104,7 @@ func xmlBody(page int) []byte {
 }
 
 func GetAllListings(apiKey string) ([]AllListings, error) {
-	var api_key string = apiKey
+	var api_key string = os.Getenv("EBAY_API_KEY")
 	var page int = 1
 	var id int = 1
 
@@ -177,17 +175,4 @@ func GetAllListings(apiKey string) ([]AllListings, error) {
 	}
 
 	return allListings, nil
-}
-
-// change the required data
-func csv() {
-
-}
-
-func sqlite() {
-
-}
-
-func postgres() {
-
 }
