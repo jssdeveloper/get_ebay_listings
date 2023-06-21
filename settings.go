@@ -9,7 +9,8 @@ import (
 
 // ----------- YOU CAN CHANGE SETTINGS FOR ENV LOCATION --------------
 const (
-	env_path string = ".env" // path to env file
+	env_path string = ".env"             // path to env file
+	csv_path string = "ebaylistings.csv" // path to csv file output
 )
 
 // -----------  GETS ENV FILE AND STORES API KEY IN VARIABLE --------------

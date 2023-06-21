@@ -1,27 +1,29 @@
 // Ebay Quantites sync
-// By Janis Stals aka jssdeveloper 2023 under MIT license
+// By Janis Stals 2023 under MIT license
 // For further information please read LICENSE file
 
 package main
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sync"
+	"os"
 	"time"
 )
 
+// eBay response struct
 type Listing struct {
 	ActiveList struct {
 		ItemArray struct {
 			Item []struct {
 				ItemID        int `xml:"ItemID"`
 				BuyItNowPrice struct {
-					Text       string `xml:",chardata"`
-					CurrencyID string `xml:"currencyID,attr"`
+					Text       float64 `xml:",chardata"`
+					CurrencyID string  `xml:"currencyID,attr"`
 				} `xml:"BuyItNowPrice"`
 				Title             string `xml:"Title"`
 				WatchCount        int    `xml:"WatchCount"`
@@ -37,37 +39,58 @@ type Listing struct {
 	} `xml:"ActiveList"`
 }
 
+// Struct to save data to csv
 type ItemOut struct {
-	ItemId     int
-	Sku        string
-	Price      float64
-	Title      string
-	WatchCount int
+	ItemId            int
+	Sku               string
+	Price             float64
+	Title             string
+	WatchCount        int
+	QuantityAvailable int
 }
 
 var allItems []ItemOut
-var wg sync.WaitGroup
 
 func main() {
 
-	// get page count
+	// Get page count
 	fmt.Println("Gettig page count")
 	pages, err := getListings(1)
 	if err != nil {
 		panic(err)
 	}
 	pageCount := pages.ActiveList.PaginationResult.TotalNumberOfPages
-	fmt.Println("Total number of pages:", pageCount, "Each page contains 200 listings")
+	if pageCount < 1 {
+		fmt.Println("Check your API key and make sure ebay account has active listings!")
+		os.Exit(1)
+	} else {
+		fmt.Println("Total number of pages:", pageCount, "Each page contains 200 listings")
+	}
 
-	for i := 1; i <= pageCount; i++ {
+	// Runs main script to download data from eBay
+	fmt.Println("Starting to download eBay listings..")
+	for i := 1; i <= 2; i++ {
 
 		data, err := getListings(i)
 		if err != nil {
 			panic(err)
 		}
 
+		for _, v := range data.ActiveList.ItemArray.Item {
+			item := ItemOut{ItemId: v.ItemID, Sku: v.SKU, Price: v.BuyItNowPrice.Text, Title: v.Title, WatchCount: v.WatchCount, QuantityAvailable: v.QuantityAvailable}
+			allItems = append(allItems, item)
+		}
+
 		fmt.Println("Done Page", i, "Fetched", len(data.ActiveList.ItemArray.Item), "items")
 	}
+
+	// Creates output csv. To change file location, please go to settings.go and change csv_path
+	err = createCsv()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Ebay import finished!")
 }
 
 // Function to get particular page
@@ -87,12 +110,15 @@ func xmlBody(page int) []byte {
 	return body
 }
 
+// Main function to download eBay data
 func getListings(page int) (Listing, error) {
+	fmt.Println("Fetching page", page)
 	xmlPayload := xmlBody(page)
 
 	req, err := http.NewRequest("POST", "https://api.ebay.com/ws/api.dll", bytes.NewReader(xmlPayload))
 	if err != nil {
-		panic(err)
+		fmt.Println("Error connecting to ebay")
+		os.Exit(1)
 	}
 
 	// Set the request headers
@@ -109,7 +135,7 @@ func getListings(page int) (Listing, error) {
 	// Send the request and get the response
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return Listing{}, err
 	}
 
 	defer resp.Body.Close()
@@ -117,14 +143,36 @@ func getListings(page int) (Listing, error) {
 	// Read the response body
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		return Listing{}, err
 	}
 
 	listing := &Listing{}
 
 	_ = xml.Unmarshal([]byte(body), &listing)
 
-	fmt.Println("Fetched page", page)
-
 	return *listing, nil
+}
+
+// Function to create output csv file. To change csv file path, go to settings.go and change csv_path
+func createCsv() error {
+	file, err := os.Create(csv_path)
+	if err != nil {
+		fmt.Println("Error creating csv file")
+		return (err)
+	}
+	defer file.Close()
+
+	csvWriter := csv.NewWriter(file)
+	defer csvWriter.Flush()
+
+	csvWriter.Write([]string{"ItemId", "Sku", "Price", "Title", "Watch Count", "Quantity Available"})
+	for _, v := range allItems {
+		itemId := fmt.Sprintf("%v", v.ItemId)
+		price := fmt.Sprintf("%v", v.Price)
+		wathcCount := fmt.Sprintf("%v", v.WatchCount)
+		quantityAvailable := fmt.Sprintf("%v", v.QuantityAvailable)
+		csvWriter.Write([]string{itemId, v.Sku, price, v.Title, wathcCount, quantityAvailable})
+	}
+	fmt.Println("Writing CSV file completed!")
+	return nil
 }
